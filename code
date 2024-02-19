@@ -1,0 +1,310 @@
+#include <iostream>
+#include <conio.h>
+#include <ncurses.h>
+#include <unistd.h>
+#include <time.h>
+
+using namespace std;
+
+// выедем основыне перменные
+
+struct Point{
+  int x = 0;
+  int y = 0;
+};
+
+enum GameColor {
+    FIELD = 1,
+    APPLE,
+    SNAKE,
+    MEGA,
+    TEXT
+};
+
+bool gameOver;
+const int width = 30;
+const int height = 20;
+int x, y, m, score;
+Point mega, fruit;
+int tailX[100], tailY[100];
+int nTail;
+
+enum eDirection
+{
+  STOP = 0,
+  LEFT,
+  RIGHT,
+  DOWN,
+  UP
+};
+eDirection dir;
+
+// обозначим границы, местоположение фруктов и змеи
+
+void Setup()
+{
+  srand(time(NULL));
+  gameOver = false;
+  dir = STOP;
+  x = width / 2 - 1;
+  y = height / 2 - 1;
+  fruit.x = rand() % (width - 1);
+  fruit.y = rand() % height;
+  score = 0;
+  m = rand();
+  mega.x = rand() % (width - 1);
+  mega.y = rand() % height;
+}
+
+void Fruits(int i, int j){
+        attron(COLOR_PAIR(APPLE));
+        printw("@");
+}
+
+void MFruits(int i, int j){
+        attron(COLOR_PAIR(MEGA));
+        printw("$");
+} 
+
+void Snake(int i, int j){
+    attron(COLOR_PAIR(SNAKE));
+    printw("X");
+    }
+    
+void Tail(int i, int j){
+        bool print = false;
+        for (int k = 0; k < nTail; k++)
+        {
+          if (tailX[k] == j && tailY[k] == i)
+          {
+            print = true;
+            attron(COLOR_PAIR(SNAKE));
+            printw("0");
+          }
+        }
+        if (!print)
+        printw(" ");
+}
+
+
+void Game()
+{
+    clear();
+  for (int i = 0; i < width + 1; i++){
+  attron(COLOR_PAIR(FIELD));
+    printw("#");
+  }
+  printw("                                                 ");
+ 
+  // введем основные символы участвующие в отображении
+  // игры (границы карты, фрукты, змейка)
+
+  for (int i = 0; i < height; i++)
+  {
+    for (int j = 0; j < width; j++)
+    {
+      if (j == 0 or j == width - 1)
+      {
+        attron(COLOR_PAIR(FIELD));
+        printw("|");
+      }
+      if (i == y && j == x)
+      {
+        Snake(i,j);
+      }
+      else if(i == fruit.y && j == fruit.x)
+      {
+        Fruits(i,j);
+      }
+      else if(score % 10 == 0 && i == mega.y && j == mega.x && score != 0)
+      {
+        MFruits(i,j);
+        }
+    else 
+        {
+        Tail(i,j);    
+        }
+    }
+    printw("                                                ");
+  }
+
+  for (int i = 0; i < width + 1; i++){
+      attron(COLOR_PAIR(FIELD));
+    printw("#");
+  }
+  attron(COLOR_PAIR(TEXT));
+   printw("                                                 ");
+  printw ("Score ");
+  string s_eaten_apples = to_string(score);
+  printw(s_eaten_apples.c_str());
+  printw(" | WASD For controll. Press X to end");
+}
+
+
+// механика передвижения и принудительной остановки игры
+
+void Input()
+{
+  if (initscr())
+  {
+    switch (getch())
+    {
+    case 'a':
+      dir = LEFT;
+      break;
+    case 'w':
+      dir = UP;
+      break;
+    case 's':
+      dir = DOWN;
+      break;
+    case 'd':
+      dir = RIGHT;
+      break;
+    case 'x':
+      gameOver = true;
+      break;
+    }
+  }
+}
+
+// увеличение длинны змеи при получении очков
+
+void Logic()
+{
+  int prevX = tailX[0];
+  int prevY = tailY[0];
+  int prev2X, prev2Y;
+  tailX[0] = x;
+  tailY[0] = y;
+  for (int i = 1; i < nTail; i++)
+  {
+    prev2X = tailX[i];
+    prev2Y = tailY[i];
+    tailX[i] = prevX;
+    tailY[i] = prevY;
+    prevX = prev2X;
+    prevY = prev2Y;
+  }
+  switch (dir)
+  {
+  case LEFT:
+    x--;
+    break;
+  case UP:
+    y--;
+    break;
+  case DOWN:
+    y++;
+    break;
+  case RIGHT:
+    x++;
+    break;
+  }
+}
+
+void Death (){
+  // вариант, где змейка умирает при врезании в стенку закоментирован
+
+  /*
+  if (x == width-1 or y == height or x == -1 or y == -1)
+    gameOver = true;
+*/
+
+  // Змейнка проходит через стену
+
+  if (x >= width - 1)
+    x = 0;
+  else if (x < 0)
+    x = width - 2;
+
+  if (y >= height)
+    y = 0;
+  else if (y < 0)
+    y = height - 1;
+
+  // смерть при врезании в хвост
+
+  for (int i = 0; i < nTail; i++)
+  {
+    if (tailX[i] == x && tailY[i] == y)
+      gameOver = true;
+  }
+}
+
+// создаем новый фрукт после поедания старого
+void Fruits(){
+    if (x == fruit.x && y == fruit.y)
+    {
+        fruit.y != y;
+        fruit.y != tailY[nTail];
+        fruit.x != x;
+        fruit.x != tailX[nTail];
+        score += 1;
+        nTail++;
+        fruit.x = (rand() % (width - 4)) + 3;
+        fruit.y = (rand() % (height - 4)) + 3;
+    }
+    if (x == mega.x && y == mega.y)
+    {
+        score += 3;
+        m = rand();
+        mega.x = (rand() % (width - 4)) + 3;
+        mega.y = (rand() % (height - 4)) + 3;
+        for (int i = 0; i < 3; i++)
+        {
+            nTail++;
+        }
+    }
+}
+
+/*
+конец игр
+конец игры наступает при 1000 набранных очках или
+после врезания в змеии в саму себя,     так же здесь обозначена задержка перед пермещением
+*/
+
+int main()
+{
+  int a;
+  initscr();
+
+fputs("\e[?25l", stdout); /* hide the cursor */
+
+  curs_set(0);
+
+if (!has_colors()) {
+        printf("Не поддерживает цвет");
+        timeout(5000);
+        exit(1);
+    }
+  
+  start_color();
+  
+  init_pair(MEGA, COLOR_RED,COLOR_BLACK);
+  init_pair(SNAKE, COLOR_BLUE,COLOR_BLACK);
+  init_pair(TEXT, COLOR_WHITE,COLOR_BLACK);
+  init_pair(FIELD, COLOR_GREEN,COLOR_BLACK);
+  init_pair(APPLE, COLOR_GREEN,COLOR_BLACK);
+
+  noecho();
+
+Setup();
+  while (!gameOver)
+  {
+    Game();
+    Input();
+    Logic();
+    Death();
+    Fruits();
+    timeout(1000);
+    refresh();
+    if (score >= 1000)
+      return 0;
+  }
+  initscr();
+  cout << "Your score: " << score;
+  cin >> a;
+  endwin();
+  return 0;
+}   
